@@ -1,1 +1,3 @@
-
+git rm acid
+git commit -m "Remove acid file"
+git push
