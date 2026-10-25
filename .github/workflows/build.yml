@@ -1,0 +1,22 @@
+name: Build
+on: [push, workflow_dispatch]
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Linux-Abhängigkeiten
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev libx11-dev libxinerama-dev libxext-dev libxrandr-dev libxcursor-dev libfreetype-dev libfontconfig1-dev libgl1-mesa-dev
+      - name: Konfigurieren
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release
+      - name: Bauen
+        run: cmake --build build --config Release --parallel
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Acid303-${{ matrix.os }}
+          path: build/Acid303_artefacts/Release/
