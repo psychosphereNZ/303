@@ -23,11 +23,12 @@ juce_add_plugin(Acid303
   FORMATS ${PLUGIN_FORMATS}
   PRODUCT_NAME "Acid303")
 
-target_sources(Acid303 PRIVATE
-  Source/PluginProcessor.h
-  Source/PluginProcessor.cpp
-  Source/PluginEditor.h
-  Source/PluginEditor.cpp)
+file(GLOB PLUGIN_SOURCES
+  ${CMAKE_CURRENT_SOURCE_DIR}/Source/*.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/Source/*.h
+  ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/*.h)
+target_sources(Acid303 PRIVATE ${PLUGIN_SOURCES})
 
 target_compile_features(Acid303 PRIVATE cxx_std_17)
 target_compile_definitions(Acid303 PUBLIC
