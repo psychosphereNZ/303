@@ -1,5 +1,6 @@
 #pragma once
 #include "PluginProcessor.h"
+#include "LookAndFeel303.h"
 #include <memory>
 #include <vector>
 
@@ -37,6 +38,7 @@ private:
         std::unique_ptr<ButtonAtt> gateAtt, accAtt, slideAtt;
     };
 
+    Acid303LookAndFeel laf;   // muss vor allen Komponenten deklariert sein
     Acid303Processor& proc;
 
     std::vector<std::unique_ptr<Knob>> soundKnobs, seqKnobs;

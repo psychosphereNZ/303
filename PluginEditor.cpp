@@ -2,19 +2,20 @@
 
 namespace
 {
-    const juce::Colour kBg     (0xff17171a);
-    const juce::Colour kPanel  (0xff26262b);
-    const juce::Colour kText   (0xffe6e6e6);
+    const juce::Colour kInk    (0xff1b1b1d);
     const juce::Colour kOrange (0xffff5a36);
+    const juce::Colour kAmber  (0xffffb020);
+    const juce::Colour kRed    (0xffff3b30);
+    const juce::Colour kGreen  (0xff35d08a);
     const juce::Colour kBlue   (0xff3ec6ff);
-    const juce::Colour kGate   (0xffe0e0e0);
-    const juce::Colour kHot    (0xff3a2a24);
+    const juce::Colour kHot    (0x66ff7a1a);
     const int kLabelCol = 60;
 }
 
 Acid303Editor::Acid303Editor (Acid303Processor& p)
     : AudioProcessorEditor (&p), proc (p)
 {
+    setLookAndFeel (&laf);
     setSize (940, 580);
 
     auto addKnob = [this] (std::vector<std::unique_ptr<Knob>>& list, const juce::String& id, const juce::String& text)
@@ -22,13 +23,9 @@ Acid303Editor::Acid303Editor (Acid303Processor& p)
         auto k = std::make_unique<Knob>();
         k->slider.setSliderStyle (juce::Slider::RotaryHorizontalVerticalDrag);
         k->slider.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 70, 16);
-        k->slider.setColour (juce::Slider::rotarySliderFillColourId, kOrange);
-        k->slider.setColour (juce::Slider::thumbColourId, kText);
-        k->slider.setColour (juce::Slider::textBoxTextColourId, kText);
-        k->slider.setColour (juce::Slider::textBoxOutlineColourId, juce::Colours::transparentBlack);
         k->label.setText (text, juce::dontSendNotification);
         k->label.setJustificationType (juce::Justification::centred);
-        k->label.setColour (juce::Label::textColourId, kText);
+        k->label.setFont (juce::FontOptions (12.0f, juce::Font::bold));
         addAndMakeVisible (k->slider);
         addAndMakeVisible (k->label);
         k->att = std::make_unique<SliderAtt> (proc.apvts, id, k->slider);
@@ -52,10 +49,7 @@ Acid303Editor::Acid303Editor (Acid303Processor& p)
     auto setupToggle = [this] (juce::TextButton& b, juce::Colour on)
     {
         b.setClickingTogglesState (true);
-        b.setColour (juce::TextButton::buttonColourId, kPanel);
         b.setColour (juce::TextButton::buttonOnColourId, on);
-        b.setColour (juce::TextButton::textColourOffId, kText);
-        b.setColour (juce::TextButton::textColourOnId, juce::Colours::black);
         addAndMakeVisible (b);
     };
     setupToggle (runBtn, kOrange);
@@ -63,12 +57,8 @@ Acid303Editor::Acid303Editor (Acid303Processor& p)
     runAtt  = std::make_unique<ButtonAtt> (proc.apvts, "run", runBtn);
     syncAtt = std::make_unique<ButtonAtt> (proc.apvts, "sync", syncBtn);
 
-    for (auto* b : { &randBtn, &clearBtn })
-    {
-        b->setColour (juce::TextButton::buttonColourId, kPanel);
-        b->setColour (juce::TextButton::textColourOffId, kText);
-        addAndMakeVisible (*b);
-    }
+    addAndMakeVisible (randBtn);
+    addAndMakeVisible (clearBtn);
     randBtn.onClick  = [this] { randomizePattern(); };
     clearBtn.onClick = [this] { clearPattern(); };
 
@@ -83,21 +73,16 @@ Acid303Editor::Acid303Editor (Acid303Processor& p)
 
         s->note.setSliderStyle (juce::Slider::LinearVertical);
         s->note.setTextBoxStyle (juce::Slider::TextBoxBelow, false, 40, 16);
-        s->note.setColour (juce::Slider::trackColourId, kOrange);
-        s->note.setColour (juce::Slider::thumbColourId, kText);
-        s->note.setColour (juce::Slider::textBoxTextColourId, kText);
-        s->note.setColour (juce::Slider::textBoxOutlineColourId, juce::Colours::transparentBlack);
 
         auto prep = [this] (juce::TextButton& b, juce::Colour on)
         {
             b.setClickingTogglesState (true);
-            b.setColour (juce::TextButton::buttonColourId, kPanel);
             b.setColour (juce::TextButton::buttonOnColourId, on);
             addAndMakeVisible (b);
         };
-        prep (s->gate,  kGate);
-        prep (s->acc,   kOrange);
-        prep (s->slide, kBlue);
+        prep (s->gate,  kAmber);
+        prep (s->acc,   kRed);
+        prep (s->slide, kGreen);
         addAndMakeVisible (s->note);
 
         s->noteAtt  = std::make_unique<SliderAtt> (proc.apvts, "note" + n,  s->note);
@@ -110,7 +95,11 @@ Acid303Editor::Acid303Editor (Acid303Processor& p)
     startTimerHz (30);
 }
 
-Acid303Editor::~Acid303Editor() { stopTimer(); }
+Acid303Editor::~Acid303Editor()
+{
+    stopTimer();
+    setLookAndFeel (nullptr);
+}
 
 void Acid303Editor::setParam (const juce::String& id, float plainValue)
 {
@@ -121,7 +110,7 @@ void Acid303Editor::setParam (const juce::String& id, float plainValue)
 void Acid303Editor::randomizePattern()
 {
     juce::Random rng;
-    static const int scale[] = { 0, 0, 0, 3, 5, 7, 10, 12, 12, 15, 19, 24 };   // Moll-Pentatonik, Grundton betont
+    static const int scale[] = { 0, 0, 0, 3, 5, 7, 10, 12, 12, 15, 19, 24 };
 
     for (int i = 0; i < Acid303Processor::kSteps; ++i)
     {
@@ -157,11 +146,29 @@ void Acid303Editor::timerCallback()
 
 void Acid303Editor::paint (juce::Graphics& g)
 {
-    g.fillAll (kBg);
+    // Silbernes Gehäuse
+    g.setGradientFill (juce::ColourGradient (juce::Colour (0xffd6d9de), 0.0f, 0.0f,
+                                             juce::Colour (0xff9da1a8), 0.0f, (float) getHeight(), false));
+    g.fillAll();
 
+    // Gebürstete Struktur
+    g.setColour (juce::Colour (0x0c000000));
+    for (int y = 0; y < getHeight(); y += 3)
+        g.drawHorizontalLine (y, 0.0f, (float) getWidth());
+
+    // Titel
+    g.setColour (kInk);
+    g.setFont (juce::FontOptions (24.0f, juce::Font::bold));
+    g.drawText ("ACID303", 14, 8, 200, 28, juce::Justification::left);
+    g.setFont (juce::FontOptions (11.0f));
+    g.drawText ("BASS LINE  /  16 STEP SEQUENCER", 150, 14, 300, 18, juce::Justification::left);
     g.setColour (kOrange);
-    g.setFont (juce::FontOptions (22.0f, juce::Font::bold));
-    g.drawText ("ACID303", 14, 8, 300, 28, juce::Justification::left);
+    g.fillRect (14, 38, getWidth() - 28, 2);
+
+    // Vertiefter Step-Bereich
+    g.setColour (juce::Colour (0x22000000));
+    g.fillRoundedRectangle (10.0f, (float) stepTop - 6.0f, (float) getWidth() - 20.0f,
+                            (float) (stepBottom - stepTop) + 12.0f, 6.0f);
 
     if (shownStep >= 0 && shownStep < (int) steps.size())
     {
@@ -171,15 +178,15 @@ void Acid303Editor::paint (juce::Graphics& g)
                                 (float) s.note.getWidth() + 4.0f, (float) (stepBottom - stepTop), 4.0f);
     }
 
-    g.setColour (kText);
-    g.setFont (juce::FontOptions (11.0f));
+    g.setColour (kInk);
+    g.setFont (juce::FontOptions (11.0f, juce::Font::bold));
     for (size_t i = 0; i < steps.size(); ++i)
         g.drawText (juce::String ((int) i + 1), steps[i]->note.getX(), stepTop, steps[i]->note.getWidth(), 16,
                     juce::Justification::centred);
 
     auto label = [&] (const juce::String& t, int y, int h)
     {
-        g.drawText (t, 14, y, kLabelCol - 6, h, juce::Justification::centredLeft);
+        g.drawText (t, 18, y, kLabelCol - 8, h, juce::Justification::centredLeft);
     };
     label ("NOTE",   steps[0]->note.getY(),  steps[0]->note.getHeight());
     label ("GATE",   steps[0]->gate.getY(),  steps[0]->gate.getHeight());
