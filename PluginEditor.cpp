@@ -16,7 +16,6 @@ Acid303Editor::Acid303Editor (Acid303Processor& p)
     : AudioProcessorEditor (&p), proc (p)
 {
     setLookAndFeel (&laf);
-    setSize (940, 580);
 
     auto addKnob = [this] (std::vector<std::unique_ptr<Knob>>& list, const juce::String& id, const juce::String& text)
     {
@@ -29,6 +28,14 @@ Acid303Editor::Acid303Editor (Acid303Processor& p)
         addAndMakeVisible (k->slider);
         addAndMakeVisible (k->label);
         k->att = std::make_unique<SliderAtt> (proc.apvts, id, k->slider);
+        if (id != "root" && id != "length")   // Ganzzahl-Parameter behalten ihre Anzeige
+        {
+            k->slider.textFromValueFunction = [] (double v)
+            {
+                return juce::String (v, (v >= 10.0 || v <= -10.0) ? 1 : 2);
+            };
+            k->slider.updateText();
+        }
         list.push_back (std::move (k));
     };
 
@@ -92,6 +99,7 @@ Acid303Editor::Acid303Editor (Acid303Processor& p)
         steps.push_back (std::move (s));
     }
 
+    setSize (940, 580);   // erst nach dem Anlegen aller Komponenten, damit resized() sie positioniert
     startTimerHz (30);
 }
 
