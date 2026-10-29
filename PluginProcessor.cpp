@@ -7,8 +7,8 @@ using APVTS = juce::AudioProcessorValueTreeState;
 
 namespace
 {
-    // Start-Pattern (0 = Grundton, Halbtonschritte darüber)
-    const int  defNote[16]  = { 0, 0, 12, 0, 3, 0, 10, 0, 0, 12, 0, 7, 5, 0, 3, 15 };
+    // Start-Pattern. Note = Halbtöne über ROOT; 12 entspricht der mittleren Oktave der Write-Tastatur.
+    const int  defNote[16]  = { 12, 12, 24, 12, 15, 12, 22, 12, 12, 24, 12, 19, 17, 12, 15, 27 };
     const bool defGate[16]  = { 1, 1, 1,  0, 1, 1, 1,  0, 1, 1,  0, 1, 1, 1, 1, 1 };
     const bool defAcc[16]   = { 0, 0, 1,  0, 0, 0, 1,  0, 0, 1,  0, 0, 1, 0, 0, 1 };
     const bool defSlide[16] = { 0, 0, 0,  0, 0, 1, 0,  0, 0, 0,  0, 1, 0, 0, 1, 0 };
@@ -20,7 +20,7 @@ Acid303Processor::Acid303Processor()
 {
     auto get = [this] (const juce::String& id) { return apvts.getRawParameterValue (id); };
 
-    pWave = get ("wave");   pTune = get ("tune");   pCutoff = get ("cutoff");
+    pWave = get ("wave");   pFilter = get ("filter"); pTune = get ("tune");   pCutoff = get ("cutoff");
     pReso = get ("reso");   pEnvMod = get ("envmod"); pDecay = get ("decay");
     pAccent = get ("accent"); pSlide = get ("slide"); pVolume = get ("volume");
     pRun = get ("run");     pSync = get ("sync");   pBpm = get ("bpm");
@@ -31,6 +31,7 @@ Acid303Processor::Acid303Processor()
         const auto n = juce::String (i + 1);
         pNote[i]      = get ("note" + n);
         pGate[i]      = get ("gate" + n);
+        pTie[i]       = get ("tie" + n);
         pAcc[i]       = get ("acc" + n);
         pStepSlide[i] = get ("slide" + n);
     }
@@ -47,9 +48,11 @@ APVTS::ParameterLayout Acid303Processor::createLayout()
     // Klang
     l.add (std::make_unique<juce::AudioParameterChoice> (juce::ParameterID { "wave", 1 }, "Waveform",
                                                          juce::StringArray { "Saw", "Square" }, 0));
+    l.add (std::make_unique<juce::AudioParameterChoice> (juce::ParameterID { "filter", 1 }, "Filter Slope",
+                                                         juce::StringArray { "12 dB", "24 dB" }, 0));   // 12 dB = Hauptfilter
     l.add (std::make_unique<F> (juce::ParameterID { "tune", 1 },   "Tune (cents)", R (-100.f, 100.f, 0.1f), 0.f));
     l.add (std::make_unique<F> (juce::ParameterID { "cutoff", 1 }, "Cutoff",       R (50.f, 8000.f, 0.f, 0.3f), 400.f));
-    l.add (std::make_unique<F> (juce::ParameterID { "reso", 1 },   "Resonance",    R (0.f, 1.f), 0.6f));
+    l.add (std::make_unique<F> (juce::ParameterID { "reso", 1 },   "Resonance",    R (0.f, 1.f), 0.7f));
     l.add (std::make_unique<F> (juce::ParameterID { "envmod", 1 }, "Env Mod",      R (0.f, 1.f), 0.6f));
     l.add (std::make_unique<F> (juce::ParameterID { "decay", 1 },  "Decay (s)",    R (0.08f, 2.0f, 0.f, 0.5f), 0.4f));
     l.add (std::make_unique<F> (juce::ParameterID { "accent", 1 }, "Accent",       R (0.f, 1.f), 0.7f));
@@ -60,7 +63,7 @@ APVTS::ParameterLayout Acid303Processor::createLayout()
     l.add (std::make_unique<B> (juce::ParameterID { "run", 1 },  "Run",       false));
     l.add (std::make_unique<B> (juce::ParameterID { "sync", 1 }, "Host Sync", false));
     l.add (std::make_unique<F> (juce::ParameterID { "bpm", 1 },  "Tempo",     R (50.f, 220.f, 0.1f), 130.f));
-    l.add (std::make_unique<I> (juce::ParameterID { "root", 1 }, "Root Note", 24, 60, 36));
+    l.add (std::make_unique<I> (juce::ParameterID { "root", 1 }, "Root Note", 24, 60, 24));
     l.add (std::make_unique<I> (juce::ParameterID { "length", 1 }, "Length",  1, 16, 16));
     l.add (std::make_unique<F> (juce::ParameterID { "gatelen", 1 }, "Gate Length", R (0.1f, 0.95f), 0.55f));
 
@@ -68,8 +71,9 @@ APVTS::ParameterLayout Acid303Processor::createLayout()
     for (int i = 0; i < kSteps; ++i)
     {
         const auto n = juce::String (i + 1);
-        l.add (std::make_unique<I> (juce::ParameterID { "note" + n, 1 },  "Step " + n + " Note",   0, 24, defNote[i]));
+        l.add (std::make_unique<I> (juce::ParameterID { "note" + n, 1 },  "Step " + n + " Note",   0, 36, defNote[i]));
         l.add (std::make_unique<B> (juce::ParameterID { "gate" + n, 1 },  "Step " + n + " Gate",   defGate[i]));
+        l.add (std::make_unique<B> (juce::ParameterID { "tie" + n, 1 },   "Step " + n + " Tie",    false));
         l.add (std::make_unique<B> (juce::ParameterID { "acc" + n, 1 },   "Step " + n + " Accent", defAcc[i]));
         l.add (std::make_unique<B> (juce::ParameterID { "slide" + n, 1 }, "Step " + n + " Slide",  defSlide[i]));
     }
@@ -83,14 +87,16 @@ void Acid303Processor::prepareToPlay (double sampleRate, int samplesPerBlock)
     sr = sampleRate;
     juce::dsp::ProcessSpec spec { sampleRate, (juce::uint32) juce::jmax (samplesPerBlock, 64), 1 };
     filter.prepare (spec);
-    filter.setMode (juce::dsp::LadderFilter<float>::Mode::LPF24);
+    filter.setMode (juce::dsp::LadderFilter<float>::Mode::LPF12);
     filter.setDrive (1.5f);
     filter.reset();
+    currentFilterMode = -1;
 
     heldNotes.clear();
     gate = false;
     ampEnv = filterEnv = accentEnv = 0.0f;
     wasRunning = false;
+    auditionNote = -1;
     stopSequencer();
 }
 
@@ -162,6 +168,15 @@ void Acid303Processor::renderChunk (float* out, int numSamples)
     const float accAmt  = pAccent->load();
     const float slideMs = pSlide->load();
     const float volume  = pVolume->load();
+
+    // Hauptfilter: 12 dB (Standard) oder 24 dB
+    const int filterMode = (int) pFilter->load();
+    if (filterMode != currentFilterMode)
+    {
+        currentFilterMode = filterMode;
+        filter.setMode (filterMode == 0 ? juce::dsp::LadderFilter<float>::Mode::LPF12
+                                        : juce::dsp::LadderFilter<float>::Mode::LPF24);
+    }
 
     const float fsr = (float) sr;
     const float slideCoef = 1.0f - std::exp (-1.0f / (slideMs * 0.001f * fsr));
@@ -236,21 +251,33 @@ void Acid303Processor::triggerStep (int stepInt, int length, double inc)
 {
     lastTriggered = stepInt;
     const int idx = ((stepInt % length) + length) % length;
+    const int nextIdx = (idx + 1) % length;
     currentStep.store (idx);
 
     const bool on  = pGate[idx]->load() > 0.5f;
-    const bool acc = pAcc[idx]->load() > 0.5f;
+    const bool tie = pTie[idx]->load()  > 0.5f;
+    const bool acc = pAcc[idx]->load()  > 0.5f;
     const bool sld = pStepSlide[idx]->load() > 0.5f;
+    const bool nextTie = pGate[nextIdx]->load() > 0.5f && pTie[nextIdx]->load() > 0.5f;
     const int note = juce::jlimit (0, 127, (int) std::lround (pRoot->load()) + (int) std::lround (pNote[idx]->load()));
+    const int gateSamples = juce::jmax (1, (int) (pGateLen->load() / inc));
+
+    // Tie: Die vorherige Note klingt über diesen Step einfach weiter (kein neuer Anschlag)
+    if (on && tie && seqNote >= 0)
+    {
+        gateCountdown = (sld || nextTie) ? -1 : gateSamples;
+        return;
+    }
 
     // Erst die neue Note an, dann die vorherige (gehaltene) Note aus:
     // so entsteht bei einem Slide-Step ein Legato-Übergang mit Pitch-Glide.
-    if (on) noteOn (note, acc ? 1.0f : 0.6f);
+    const bool play = on && ! tie;
+    if (play) noteOn (note, acc ? 1.0f : 0.6f);
     if (seqNote >= 0) noteOff (seqNote);
-    seqNote = on ? note : -1;
+    seqNote = play ? note : -1;
 
-    // Slide-Step: Gate bleibt offen bis zum nächsten Step
-    gateCountdown = (on && ! sld) ? juce::jmax (1, (int) (pGateLen->load() / inc)) : -1;
+    // Slide oder nachfolgender Tie: Gate bleibt bis zum nächsten Step offen
+    gateCountdown = (play && ! (sld || nextTie)) ? gateSamples : -1;
 }
 
 void Acid303Processor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi)
@@ -260,6 +287,28 @@ void Acid303Processor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mid
 
     const int n = buffer.getNumSamples();
     float* out = buffer.getWritePointer (0);
+
+    // Vorhören einer Note aus dem Editor (Write-Modus): kurze Note per MIDI-Event
+    const int aReq = auditionRequest.exchange (-1);
+    if (aReq >= 0)
+    {
+        if (auditionNote >= 0) midi.addEvent (juce::MidiMessage::noteOff (1, auditionNote), 0);
+        auditionNote = aReq;
+        midi.addEvent (juce::MidiMessage::noteOn (1, auditionNote, (juce::uint8) 90), 0);
+        auditionSamplesLeft = (int) (sr * 0.2);
+    }
+    if (auditionNote >= 0)
+    {
+        if (auditionSamplesLeft < n)
+        {
+            midi.addEvent (juce::MidiMessage::noteOff (1, auditionNote), juce::jmax (0, auditionSamplesLeft));
+            auditionNote = -1;
+        }
+        else
+        {
+            auditionSamplesLeft -= n;
+        }
+    }
 
     // Transport
     const bool runParam  = pRun->load()  > 0.5f;

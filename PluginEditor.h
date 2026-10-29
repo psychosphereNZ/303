@@ -1,6 +1,7 @@
 #pragma once
 #include "PluginProcessor.h"
 #include "LookAndFeel303.h"
+#include <array>
 #include <memory>
 #include <vector>
 
@@ -19,6 +20,14 @@ private:
     void clearPattern();
     void setParam (const juce::String& id, float plainValue);
 
+    // Write-Modus (Pattern-Programmierung wie bei der 303)
+    int  patternLength() const;
+    void writeKey (int key);
+    void writeRest();
+    void writeTie();
+    void advanceCursor (int delta);
+    void clearFlags();
+
     using SliderAtt = juce::AudioProcessorValueTreeState::SliderAttachment;
     using ButtonAtt = juce::AudioProcessorValueTreeState::ButtonAttachment;
     using ComboAtt  = juce::AudioProcessorValueTreeState::ComboBoxAttachment;
@@ -33,9 +42,9 @@ private:
     struct Step
     {
         juce::Slider note;
-        juce::TextButton gate, acc, slide;
+        juce::TextButton gate, tie, acc, slide;
         std::unique_ptr<SliderAtt> noteAtt;
-        std::unique_ptr<ButtonAtt> gateAtt, accAtt, slideAtt;
+        std::unique_ptr<ButtonAtt> gateAtt, tieAtt, accAtt, slideAtt;
     };
 
     Acid303LookAndFeel laf;   // muss vor allen Komponenten deklariert sein
@@ -45,9 +54,17 @@ private:
     std::vector<std::unique_ptr<Step>> steps;
 
     juce::TextButton runBtn { "RUN" }, syncBtn { "HOST SYNC" }, randBtn { "RANDOM" }, clearBtn { "CLEAR" };
-    juce::ComboBox waveBox;
+    juce::ComboBox waveBox, filterBox;
     std::unique_ptr<ButtonAtt> runAtt, syncAtt;
-    std::unique_ptr<ComboAtt> waveAtt;
+    std::unique_ptr<ComboAtt> waveAtt, filterAtt;
+
+    // Write-Panel
+    juce::TextButton writeBtn { "WRITE" }, downBtn { "DOWN" }, upBtn { "UP" },
+                     accFlag { "ACCENT" }, sldFlag { "SLIDE" },
+                     restBtn { "REST" }, tieBtn { "TIE" }, backBtn { "BACK" }, nextBtn { "NEXT" };
+    std::array<juce::TextButton, 13> keys;
+    bool writeMode = false;
+    int cursor = 0;
 
     int shownStep = -2;
     int stepTop = 0, stepBottom = 0;

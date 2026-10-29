@@ -4,7 +4,8 @@
 #include <atomic>
 #include <vector>
 
-// TB-303-artiger Acid-Bass-Synth mit 16-Step-Sequencer (Note, Gate, Accent, Slide).
+// TB-303-artiger Acid-Bass-Synth mit 16-Step-Sequencer (Note, Gate, Tie, Accent, Slide)
+// und wahlweise 12-dB- oder 24-dB-Hauptfilter.
 class Acid303Processor : public juce::AudioProcessor
 {
 public:
@@ -34,7 +35,8 @@ public:
     void setStateInformation (const void*, int) override;
 
     juce::AudioProcessorValueTreeState apvts;
-    std::atomic<int> currentStep { -1 };   // für die Anzeige im Editor
+    std::atomic<int> currentStep { -1 };       // für die Lauflicht-Anzeige im Editor
+    std::atomic<int> auditionRequest { -1 };   // MIDI-Note zum Vorhören (Write-Modus)
 
 private:
     using P = std::atomic<float>*;
@@ -53,6 +55,7 @@ private:
     void stopSequencer();
 
     juce::dsp::LadderFilter<float> filter;
+    int currentFilterMode = -1;
     double sr = 44100.0;
 
     // Synth-Zustand
@@ -69,8 +72,12 @@ private:
     int gateCountdown = -1;
     bool wasRunning = false;
 
+    // Vorhören
+    int auditionNote = -1;
+    int auditionSamplesLeft = 0;
+
     // Gecachte Parameterzeiger
-    P pWave {}, pTune {}, pCutoff {}, pReso {}, pEnvMod {}, pDecay {}, pAccent {}, pSlide {}, pVolume {};
+    P pWave {}, pFilter {}, pTune {}, pCutoff {}, pReso {}, pEnvMod {}, pDecay {}, pAccent {}, pSlide {}, pVolume {};
     P pRun {}, pSync {}, pBpm {}, pRoot {}, pLength {}, pGateLen {};
-    P pNote[kSteps] {}, pGate[kSteps] {}, pAcc[kSteps] {}, pStepSlide[kSteps] {};
+    P pNote[kSteps] {}, pGate[kSteps] {}, pTie[kSteps] {}, pAcc[kSteps] {}, pStepSlide[kSteps] {};
 };
